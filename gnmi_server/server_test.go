@@ -85,7 +85,7 @@ func createServer(t *testing.T) *Server {
 
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
 	cfg := &Config{Port: 8081}
-	s, err := NewServer(cfg, opts)
+	s, err := NewServer(cfg, opts, true)
 	if err != nil {
 		t.Errorf("Failed to create gNMI server: %v", err)
 	}

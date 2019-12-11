@@ -39,10 +39,11 @@ type Config struct {
 	// Port for the Server to listen on. If 0 or unset the Server will pick a port
 	// for this Server.
 	Port int64
+	RedisLocal bool
 }
 
 // New returns an initialized Server.
-func NewServer(config *Config, opts []grpc.ServerOption) (*Server, error) {
+func NewServer(config *Config, opts []grpc.ServerOption, redis_socket bool) (*Server, error) {
 	if config == nil {
 		return nil, errors.New("config not provided")
 	}
@@ -59,7 +60,9 @@ func NewServer(config *Config, opts []grpc.ServerOption) (*Server, error) {
 	if srv.config.Port < 0 {
 		srv.config.Port = 0
 	}
-	srv.lis, err = net.Listen("tcp", fmt.Sprintf(":%d", srv.config.Port))
+	srv.config.RedisLocal = redis_socket
+	// Map the server ip to host any
+	srv.lis, err = net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", srv.config.Port))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open listener port %d: %v", srv.config.Port, err)
 	}
@@ -108,6 +111,7 @@ func (srv *Server) Subscribe(stream gnmipb.GNMI_SubscribeServer) error {
 		return nil, status.Error(codes.PermissionDenied, msg)
 	}
 	*/
+	log.V(1).Infof("Inside Subscribe interface")
 
 	c := NewClient(pr.Addr)
 
@@ -126,6 +130,7 @@ func (srv *Server) Subscribe(stream gnmipb.GNMI_SubscribeServer) error {
 	srv.cMu.Unlock()
 
 	log.Flush()
+	log.V(1).Infof("Exiting Subscribe interface")
 	return err
 }
 
@@ -149,6 +154,7 @@ func (s *Server) checkEncodingAndModel(encoding gnmipb.Encoding, models []*gnmip
 func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetResponse, error) {
 	var err error
 
+	log.V(1).Infof("Inside gNMI get interface")
 	if req.GetType() != gnmipb.GetRequest_ALL {
 		return nil, status.Errorf(codes.Unimplemented, "unsupported request type: %s", gnmipb.GetRequest_DataType_name[int32(req.GetType())])
 	}
@@ -170,17 +176,18 @@ func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetRe
 
 	paths := req.GetPath()
         target = prefix.GetTarget()
-	log.V(5).Infof("GetRequest paths: %v", paths)
+	log.V(1).Infof("GetRequest paths: %v", paths)
+	log.V(1).Infof("Target is: %s", target)
 
 	var dc sdc.Client
 
 	if target == "OTHERS" {
 		dc, err = sdc.NewNonDbClient(paths, prefix)
 	} else if isTargetDb(target) == true {
-		dc, err = sdc.NewDbClient(paths, prefix)
+		dc, err = sdc.NewDbClient(paths, prefix, s.config.RedisLocal)
 	} else {
 		/* If no prefix target is specified create new Transl Data Client . */
-		dc, err = sdc.NewTranslClient(prefix, paths)
+		dc, err = sdc.NewDbClient(paths, prefix, s.config.RedisLocal)
 	}
 
 	if err != nil {

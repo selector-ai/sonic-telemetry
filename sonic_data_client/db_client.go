@@ -110,13 +110,16 @@ type DbClient struct {
 	errors  int64
 }
 
-func NewDbClient(paths []*gnmipb.Path, prefix *gnmipb.Path) (Client, error) {
+func NewDbClient(paths []*gnmipb.Path, prefix *gnmipb.Path, redis_socket bool) (Client, error) {
 	var client DbClient
 	var err error
 
 	// Testing program may ask to use redis local tcp connection
+	UseRedisLocalTcpPort = redis_socket
+	log.V(1).Infof("Creating a new DB client. It's value is %d", UseRedisLocalTcpPort)
 	if UseRedisLocalTcpPort {
 		useRedisTcpClient()
+	        log.V(1).Infof("Creating TCP client to redis")
 	}
 	if prefix.GetTarget() == "COUNTERS_DB" {
 		err = initCountersPortNameMap()

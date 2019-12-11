@@ -118,18 +118,18 @@ func (c *Client) Run(stream gnmipb.GNMI_SubscribeServer) (err error) {
 	}
 	var dc sdc.Client
 
-    if target == "OTHERS" {
-            dc, err = sdc.NewNonDbClient(paths, prefix)
-    } else if isTargetDb(target) == true {
-            dc, err = sdc.NewDbClient(paths, prefix)
-    } else {
-            /* For any other target or no target create new Transl Client. */
-            dc, err = sdc.NewTranslClient(prefix, paths)
-    }
+	if target == "OTHERS" {
+		dc, err = sdc.NewNonDbClient(paths, prefix)
+	} else if isTargetDb(target) == true {
+		dc, err = sdc.NewDbClient(paths, prefix, true)
+	} else {
+		/* For any other target or no target create new Transl Client. */
+		dc, err = sdc.NewTranslClient(prefix, paths)
+	}
 
-    if err != nil {
-            return grpc.Errorf(codes.NotFound, "%v", err)
-    }
+	if err != nil {
+		return grpc.Errorf(codes.NotFound, "%v", err)
+	}
 
 
 	switch mode := c.subscribe.GetMode(); mode {
