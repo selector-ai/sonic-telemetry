@@ -120,7 +120,7 @@ func (c *Client) Run(stream gnmipb.GNMI_SubscribeServer) (err error) {
 	if target == "OTHERS" {
 		dc, err = sdc.NewNonDbClient(paths, prefix)
 	} else {
-		dc, err = sdc.NewDbClient(paths, prefix)
+		dc, err = sdc.NewDbClient(paths, prefix, true)
 	}
 
 	if err != nil {
