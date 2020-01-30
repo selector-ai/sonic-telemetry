@@ -170,6 +170,7 @@ func (cs *clientSubscription) Close() {
 }
 
 func (cs *clientSubscription) NewInstance(ctx context.Context) error {
+	var useRedisLocal bool = false
 	cs.cMu.Lock()
 	defer cs.cMu.Unlock()
 
@@ -195,7 +196,7 @@ func (cs *clientSubscription) NewInstance(ctx context.Context) error {
 	if target == "OTHERS" {
 		dc, err = sdc.NewNonDbClient(cs.paths, cs.prefix)
 	} else {
-		dc, err = sdc.NewDbClient(cs.paths, cs.prefix)
+		dc, err = sdc.NewDbClient(cs.paths, cs.prefix, useRedisLocal)
 	}
 	if err != nil {
 		log.V(1).Infof("Connection to DB for %v failed: %v", *cs, err)
