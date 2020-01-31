@@ -22,11 +22,13 @@ var (
 	serverKey         = flag.String("server_key", "", "TLS server private key")
 	insecure          = flag.Bool("insecure", false, "Skip providing TLS cert and key, for testing only!")
 	allowNoClientCert = flag.Bool("allow_no_client_auth", false, "When set, telemetry server will request but not require a client certificate.")
+	useRedisLocal     = flag.Bool("redis_local", false, "Connect redis via local tcp socket")
 )
 
 func main() {
 	flag.Parse()
 
+	log.V(1).Infof("Starting telemetry server")
 	switch {
 	case *port <= 0:
 		log.Errorf("port must be > 0.")
@@ -81,7 +83,8 @@ func main() {
 	opts := []grpc.ServerOption{grpc.Creds(credentials.NewTLS(tlsCfg))}
 	cfg := &gnmi.Config{}
 	cfg.Port = int64(*port)
-	s, err := gnmi.NewServer(cfg, opts)
+	log.V(1).Infof("Config is : %v", cfg)
+	s, err := gnmi.NewServer(cfg, opts, *useRedisLocal)
 	if err != nil {
 		log.Errorf("Failed to create gNMI server: %v", err)
 		return
@@ -89,5 +92,6 @@ func main() {
 
 	log.V(1).Infof("Starting RPC server on address: %s", s.Address())
 	s.Serve() // blocks until close
+	log.V(1).Infof("Exiting telemetry server")
 	log.Flush()
 }
