@@ -1,0 +1,20 @@
+FROM golang:latest
+
+RUN apt-get update && apt-get install -y \
+bash
+
+RUN mkdir -p /sonic/testing/bin
+
+WORKDIR  /sonic/testing
+
+COPY gnmi_server/gnmi_server.test bin/
+
+#ADD /usr/bin/ /usr/bin/
+
+ADD testdata  testdata/
+
+ENV PATH $PATH:/sonic/testing/bin
+
+WORKDIR /sonic/testing/bin
+
+CMD ["gnmi_server.test"]

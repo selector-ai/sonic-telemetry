@@ -106,3 +106,10 @@ deinstall:
 	rm $(DESTDIR)/usr/sbin/gnmi_set
 
 
+container:
+	docker build -t docker-telemetry -f Dockerfile .
+	docker save --output docker-telemetry.tar docker-telemetry:latest
+
+test-container:
+	docker build -t docker-telemetry-test -f Dockerfile.test .
+	docker save --output docker-telemetry-test.tar docker-telemetry-test:latest
