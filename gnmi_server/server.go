@@ -175,7 +175,6 @@ func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetRe
 	}
 
 	paths := req.GetPath()
-        target = prefix.GetTarget()
 	log.V(1).Infof("GetRequest paths: %v", paths)
 	log.V(1).Infof("Target is: %s", target)
 
@@ -183,10 +182,8 @@ func (s *Server) Get(ctx context.Context, req *gnmipb.GetRequest) (*gnmipb.GetRe
 
 	if target == "OTHERS" {
 		dc, err = sdc.NewNonDbClient(paths, prefix)
-	} else if isTargetDb(target) == true {
-		dc, err = sdc.NewDbClient(paths, prefix, s.config.RedisLocal)
 	} else {
-		/* If no prefix target is specified create new Transl Data Client . */
+	/* If no prefix target is specified create new Transl Data Client . */
 		dc, err = sdc.NewDbClient(paths, prefix, s.config.RedisLocal)
 	}
 
