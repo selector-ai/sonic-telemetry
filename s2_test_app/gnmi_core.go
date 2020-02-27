@@ -173,7 +173,6 @@ func loadConfigDB(rclient *redis.Client, mpi map[string]interface{}) {
 func prepareDb() {
 	rclient := getRedisClient()
 	defer rclient.Close()
-	rclient.FlushDB()
 	//Enable keysapce notification
 	os.Setenv("PATH", "/usr/bin:/sbin:/bin:/usr/local/bin")
 	cmd := exec.Command("redis-cli", "config", "set", "notify-keyspace-events", "KEA")
@@ -182,53 +181,64 @@ func prepareDb() {
 		log.Fatal("failed to enable redis keyspace notification ", err)
 	}
 
-	fileName := "../s2_test_data/COUNTERS_PORT_NAME_MAP.txt"
-	countersPortNameMapByte, err := ioutil.ReadFile(fileName)
+	fileName := "../s2_test_data/COUNTERS:Ethernet0.txt"
+	countersEthernet0, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("read file %v err: %v", fileName, err)
 	}
-	mpi_name_map := loadConfig("COUNTERS_PORT_NAME_MAP", countersPortNameMapByte)
-	loadDB(rclient, mpi_name_map)
+	// "Ethernet0": "oid:0x1000000000002", for port based
+	port_counter := loadConfig("COUNTERS:oid:0x1000000000002", countersEthernet0)
+	loadDB(rclient, port_counter)
 
-	fileName = "../s2_test_data/COUNTERS_QUEUE_NAME_MAP.txt"
-	countersQueueNameMapByte, err := ioutil.ReadFile(fileName)
+	fileName = "../s2_test_data/COUNTERS:Ethernet8.txt"
+	countersEthernet8, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("read file %v err: %v", fileName, err)
 	}
-	mpi_qname_map := loadConfig("COUNTERS_QUEUE_NAME_MAP", countersQueueNameMapByte)
-	loadDB(rclient, mpi_qname_map)
+	// "Ethernet8": "oid:0x1000000000004", for port based
+	port_counter = loadConfig("COUNTERS:oid:0x1000000000004", countersEthernet8)
+	loadDB(rclient, port_counter)
 
-	fileName = "../s2_test_data/COUNTERS:Ethernet0.txt"
+	fileName = "../s2_test_data/COUNTERS:Ethernet68.txt"
+	countersEthernet68, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("read file %v err: %v", fileName, err)
+	}
+	// "Ethernet68": "oid:0x1000000000013", for port based
+	port_counter = loadConfig("COUNTERS:oid:0x1000000000013", countersEthernet68)
+	loadDB(rclient, port_counter)
+
+	//Now fill the queue based counters
+	fileName = "../s2_test_data/COUNTERS:Ethernet0:Queues.txt"
 	countersEthernet0Byte, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("read file %v err: %v", fileName, err)
 	}
-	// "Ethernet0": "oid:0x15000000000025",
+	// "Ethernet0": "oid:0x15000000000025", for queue based
 	mpi_counter := loadConfig("COUNTERS:oid:0x15000000000025", countersEthernet0Byte)
 	loadDB(rclient, mpi_counter)
 
-	fileName = "../s2_test_data/COUNTERS:Ethernet8.txt"
+	fileName = "../s2_test_data/COUNTERS:Ethernet8:Queues.txt"
 	countersEthernet8Byte, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("read file %v err: %v", fileName, err)
 	}
-	// "Ethernet8": "oid:0x1500000000004d",
+	// "Ethernet8": "oid:0x1500000000004d", for queue based
 	mpi_counter = loadConfig("COUNTERS:oid:0x1500000000004d", countersEthernet8Byte)
 	loadDB(rclient, mpi_counter)
 
-	fileName = "../s2_test_data/COUNTERS:Ethernet68.txt"
+	fileName = "../s2_test_data/COUNTERS:Ethernet68:Queues.txt"
 	countersEthernet68Byte, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Fatalf("read file %v err: %v", fileName, err)
 	}
-	// "Ethernet68": "oid:0x15000000000179",
+	// "Ethernet68": "oid:0x15000000000179", for queue based
 	mpi_counter = loadConfig("COUNTERS:oid:0x15000000000179", countersEthernet68Byte)
 	loadDB(rclient, mpi_counter)
 
-	// Load CONFIG_DB for alias translation
-	//prepareConfigDb(t)
 }
 
+//Function to load basic port map and queue state through GNMI
 func LoadBasicMapAndState() {
 
 	//Prepare the config to update the database
@@ -382,25 +392,106 @@ type tablePathValue struct {
 	op        string
 }
 
+//Fetches the OID for a given port or the queue
+func getCounterOID(counterType string, key string) string {
+        fileName := "../s2_test_data/COUNTERS_PORT_NAME_MAP.txt"
+        if counterType == "Queue" {
+                fileName = "../s2_test_data/COUNTERS_QUEUE_NAME_MAP.txt"
+        }
+        countersEthernet0, err := ioutil.ReadFile(fileName)
+        if err != nil {
+                log.Fatalf("read file %v err: %v", fileName, err)
+        }
+        port_counter := loadConfig("", countersEthernet0)
+        for a, k := range port_counter {
+                //log.Println("Key:", a, "Value:", k)
+                if a == key {
+                        log.Println("Found key", k.(string))
+                        return k.(string)
+                }
+        }
+        return ""
+}
+
+func prepareCounterDb(workerId int, xpathVal string, counterVal int) (string, string) {
+	//var m map[int]string
+	//xpathVal := "/Counters/Ethernet8/Queues/SAI_QUEUE_STAT_CURR_OCCUPANCY_BYTES"
+	//xpathVal := "/Counters/Ethernet8/SAI_PORT_STAT_PFC_7_RX_PKTS"
+        xpathElements, err := xpath.ParseStringPath(xpathVal)
+        if err != nil {
+                return "",""
+        }
+	log.Println("Worker:", workerId, xpathElements)
+	//counterVal := 100
+	counterType := "Port"
+	etherVal := xpathElements[1].(string)
+	log.Println("Worker:", workerId, "Ethername is", etherVal)
+
+	fileName := "../s2_test_data/COUNTERS:EthernetXX.txt"
+	for _, bb := range xpathElements {
+		//log.Println("NKey:", aa, "NValue:", bb)
+		if bb == "Queues" {
+			fileName = "../s2_test_data/COUNTERS:EthernetXX:Queues.txt"
+			counterType = "Queue"
+			//For now update only the first queue
+			etherVal += ":0"
+		}
+	}
+	lastElem := len(xpathElements) - 1
+	log.Println("Worker:", workerId, xpathElements[lastElem])
+
+	keyVal := xpathElements[lastElem]
+
+	log.Println("Worker:", workerId, "Counter type", counterType, "Name", etherVal)
+	oidVal := "COUNTERS:" + getCounterOID(counterType, etherVal)
+
+        countersEthernet0, err := ioutil.ReadFile(fileName)
+        if err != nil {
+		log.Fatalf("Worker:", workerId, "read file %v err: %v", fileName, err)
+        }
+        port_counter := loadConfig("", countersEthernet0)
+	for a, k := range port_counter {
+		if a == keyVal {
+			port_counter[a] = counterVal
+			log.Println("Worker:", workerId, "Key:", a, "Field:", k, "Value", port_counter[a])
+		} else {
+			port_counter[a] = 0
+		}
+	}
+
+	jsonString, err := json.Marshal(port_counter)
+        if err != nil {
+		log.Fatalf("Worker:", workerId, "marshalling error err: %v", err)
+        }
+	counterFileName := "../s2_test_data/" + oidVal
+	log.Println("Worker:", workerId, "OID is", oidVal, "and filename is", counterFileName)
+	ioutil.WriteFile(counterFileName, jsonString, os.ModePerm)
+
+	return counterFileName, oidVal
+}
+
 //This function takes the xpath and derives the right file and modifies the counter.
 //After that it will be programmed either into redis or using telemetry app via gnmi server
-func setCountersInDB(xpath string, countervalue int) {
+func SetCountersInDB(workerId int, xpath string, countervalue int) {
 
-	xpathElements, err := xpath.ParseStringPath(xpath)
+	rclient := getRedisClient()
+	defer rclient.Close()
+	//Enable keysapce notification
+	os.Setenv("PATH", "/usr/bin:/sbin:/bin:/usr/local/bin")
+	cmd := exec.Command("redis-cli", "config", "set", "notify-keyspace-events", "KEA")
+	_, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		log.Fatal("failed to enable redis keyspace notification ", err)
 	}
-        fileName := xpathElements["Counters"]
-        countersPortAliasMapByte, err := ioutil.ReadFile(fileName)
-        if err != nil {
-                log.Println("read file %v err: %v", fileName, err)
-        }
-        mpi_alias_map := loadConfig("", countersPortAliasMapByte)
-	batters := mpi_alias_map["Counters"].(map[string]interface{})["Ethernet"]
 
-	ioutil.WriteFile(settingFile, out, 0600)
+	fileName , counterOID := prepareCounterDb(workerId, xpath, countervalue)
+	countersEthernet0, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("read file %v err: %v", fileName, err)
+	}
+	port_counter := loadConfig(counterOID, countersEthernet0)
+	loadDB(rclient, port_counter)
 
-	//Program the new values - TBD
 }
 
 func InitSwitchStateInDB() {

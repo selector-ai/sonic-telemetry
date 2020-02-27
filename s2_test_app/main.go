@@ -45,14 +45,14 @@ func (ir *IntRange) NextRandom(r* rand.Rand) int {
 }
 */
 
-func processCountersRandom( data counter) {
-	log.Println("Inside processCountersRandom")
-	log.Printf("Values: (%s, %d, %d, %d, %d)\n", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
+func processCountersRandom(workerId int, data counter) {
+	log.Println("Worker", workerId, "processCountersRandom: ", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
 	c1 := make(chan int64, 1)
 	for {
 		go func() {
-			log.Println("Sleeping for rand-interval", time.Duration(data.Interval_sec))
-			time.Sleep(time.Duration(data.Interval_sec) * time.Second)
+			total_secs := time.Duration(data.Interval_sec) * time.Second
+			log.Println("Sleeping for rand-interval", total_secs)
+			time.Sleep(total_secs)
 			//rand.Seed(int64(time.Now().Nanosecond()))
 			//r2 := rand.New(rand.NewSource(42))
 			//r2 := rand.Int()
@@ -67,23 +67,23 @@ func processCountersRandom( data counter) {
 
 		select {
 		case res := <-c1:
-			log.Println(res)
-			setCountersInDB(data.Counter_path, data.Counter_value)
+			//log.Println(res)
+			SetCountersInDB(workerId, data.Counter_path, int(res))
 		case <-time.After(15 * time.Second):
 			log.Println("timeout 1")
 		}
 	}
 }
 
-func processCountersIncrement( data counter) {
-	log.Println("Inside processCountersIncrement")
-	log.Printf("Values: (%s, %d, %d, %d, %d)\n", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
+func processCountersIncrement(workerId int, data counter) {
+	log.Println("Worker", workerId, "processCountersIncrement: ", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
 	c1 := make(chan int, 1)
 	n := data.Start_count
 	for {
 		go func() {
-			log.Println("Sleeping for incr-interval", time.Duration(data.Interval_sec))
-			time.Sleep(time.Duration(data.Interval_sec) * time.Second)
+			total_secs := time.Duration(data.Interval_sec) * time.Second
+			log.Println("Sleeping for incr-interval", total_secs)
+			time.Sleep(total_secs)
 			newVal := n + data.Step_count
 			log.Print("Increment: ", newVal, ",")
 			c1 <- newVal
@@ -92,18 +92,19 @@ func processCountersIncrement( data counter) {
 		select {
 		case res := <-c1:
 			n = res
-			log.Println(res)
-			setCountersInDB(data.Counter_path, data.Counter_value)
+			//log.Println(res)
+			SetCountersInDB(workerId, data.Counter_path, res)
 		case <-time.After(15 * time.Second):
 			log.Println("timeout 1")
 		}
 	}
 }
 
-func processCountersFixed( data counter) {
-	log.Println("Inside processCountersFixed")
-	log.Printf("Values: (%s, %d, %d, %d, %d)\n", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
-	setCountersInDB(data.Counter_path, data.Counter_value)
+func processCountersFixed(workerId int, data counter) {
+	log.Println("Worker", workerId, "processCountersFixed: ", data.Counter_type, data.Counter_value, data.Interval_sec, data.Start_count, data.Step_count)
+
+	//Set the counter values into the database
+	SetCountersInDB(workerId, data.Counter_path, data.Counter_value)
 }
 
 func processCounters(wg *sync.WaitGroup, id int, counterName string, data counter) {
@@ -114,11 +115,11 @@ func processCounters(wg *sync.WaitGroup, id int, counterName string, data counte
 	log.Printf("Counter: %s (%s, %s)\n", counterName, data.Description, data.Counter_path)
 
 	if data.Counter_type == "fixed" {
-		processCountersFixed(data)
+		processCountersFixed(id, data)
 	} else if data.Counter_type == "incrementing" {
-		processCountersIncrement(data)
+		processCountersIncrement(id, data)
 	} else if data.Counter_type == "random" {
-		processCountersRandom(data)
+		processCountersRandom(id, data)
 	} else {
 		log.Printf("Unknown type")
 	}
