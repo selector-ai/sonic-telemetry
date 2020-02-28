@@ -1,0 +1,36 @@
+# This is a TOML document. Boom.
+
+title = "BST statistics"
+
+[app]
+name = "sonic vswitch counters"
+
+[counters]
+  # You can indent as you please. Tabs or spaces. TOML don't care
+  [counters.1]
+  description = "fake counter that always is set to 10"
+  counter_path = "/Counters/Ethernet0/SAI_PORT_STAT_PFC_7_RX_PKTS"
+  counter_type = "fixed"
+  counter_value = 10
+
+  [counters.2]
+  description = "fake counter that generates a random value very 10s"
+  counter_path = "/Counters/Ethernet8/Queues/SAI_QUEUE_STAT_CURR_OCCUPANCY_BYTES"
+  counter_type = "random"
+  interval_sec = 10
+
+  [counters.3]
+  description = "fake counter that starts at 10, increments in steps of 100 every 11 secs"
+  counter_path = "/Counters/Ethernet68/SAI_PORT_STAT_IF_IN_UCAST_PKTS"
+  counter_type = "incrementing"
+  start_count  = 10
+  step_count   = 100
+  interval_sec = 11
+
+  [counters.4]
+  description = "fake counter that starts at 10, increments in steps of 100 every 11 secs"
+  counter_path = "/Counters/Ethernet8/SAI_PORT_STAT_IF_IN_BROADCAST_PKTS"
+  counter_type = "incrementing"
+  start_count  = 10
+  step_count   = 100
+  interval_sec = 11
